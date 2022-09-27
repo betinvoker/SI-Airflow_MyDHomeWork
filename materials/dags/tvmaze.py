@@ -1,4 +1,5 @@
 import json
+import pandas as pd
 from datetime import datetime
 
 from airflow import DAG
@@ -9,35 +10,13 @@ from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.providers.postgres.operators.postgres import PostgresOperator
 from pandas import json_normalize
 
-
 def _process_transmission_tv(ti):
     transmission_tv = ti.xcom_pull(task_ids="extract_transmission")
 
-    for val in transmission_tv:
-        try:
-            processed_fact = json_normalize(
-                {
-                    "country_name": val["show"]["network"]["country"]["name"],
-                    "country_code": val["show"]["network"]["country"]["code"],
-                    "country_timezone": val["show"]["network"]["country"]["timezone"],
-                    "webChannel_name": val["show"]["network"]["name"],
-                    "show_id": val["show"]["id"],
-                    "show_name": val["show"]["name"],
-                    "season": val["season"],
-                    "episode_number": val["number"],
-                    "episode_name": val["name"],
-                    "airdate": val["airdate"],
-                    "airstamp": val["airstamp"],
-                    "runtime": val["runtime"],
-                    "show_url": val["show"]["url"],
-                }
-            )
-            processed_fact.to_csv(
-                "/tmp/process_transmission_tv.csv", index=True, header=False
-            )
-        except:
-            print("An exception occurred")
+    df = pd.DataFrame(transmission_tv)
+    df = df[['id', 'name', 'season', 'number', 'airdate', 'airstamp', 'runtime', 'url']]
 
+    df.to_csv("/tmp/process_transmission_tv.csv", index=False, header=False)
 
 def _store_transmission_tv():
     hook = PostgresHook(postgres_conn_id="postgres")
@@ -45,7 +24,6 @@ def _store_transmission_tv():
         sql="COPY transmission_tv FROM stdin WITH DELIMITER ',' ",
         filename="/tmp/process_transmission_tv.csv",
     )
-
 
 with DAG(
     "tvmaze", start_date=datetime(2022, 1, 1), schedule_interval="@daily", catchup=False
@@ -56,20 +34,14 @@ with DAG(
         task_id="create_table",
         sql="""
         CREATE TABLE IF NOT EXISTS transmission_tv(
-            id INTEGER PRIMARY KEY,
-            country_name TEXT NOT NULL,
-            country_code TEXT NOT NULL,
-            country_timezone TEXT NOT NULL,
-            webChannel_name TEXT NOT NULL,
-            show_id INTEGER NOT NULL,
-            show_name TEXT NOT NULL,
-            season INTEGER NOT NULL,
-            episode_number INTEGER NOT NULL,
-            episode_name TEXT NOT NULL,
-            airdate DATE NOT NULL,
-            airstamp TIMESTAMP NOT NULL,
-            runtime INTEGER NOT NULL,
-            show_url TEXT NOT NULL
+            id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            season INTEGER,
+            number INTEGER,
+            airdate DATE,
+            airstamp TIMESTAMP,
+            runtime NUMERIC(4,1),
+            url TEXT NOT NULL
         );""",
     )
 
