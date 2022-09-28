@@ -16,12 +16,12 @@ def _process_transmission_tv(ti):
     df = pd.DataFrame(transmission_tv)
     df = df[['id', 'name', 'season', 'number', 'airdate', 'airstamp', 'runtime', 'url']]
 
-    df.to_csv("/tmp/process_transmission_tv.csv", index=False, header=False)
+    df.to_csv("/tmp/process_transmission_tv.csv", index=False, header=False, sep="\002")
 
 def _store_transmission_tv():
     hook = PostgresHook(postgres_conn_id="postgres")
     hook.copy_expert(
-        sql="COPY transmission_tv FROM stdin WITH DELIMITER ',' ",
+        sql="""COPY transmission_tv FROM stdin WITH DELIMITER '\002' """,
         filename="/tmp/process_transmission_tv.csv",
     )
 
@@ -40,7 +40,7 @@ with DAG(
             number INTEGER,
             airdate DATE,
             airstamp TIMESTAMP,
-            runtime NUMERIC(4,1),
+            runtime TEXT,
             url TEXT NOT NULL
         );""",
     )
